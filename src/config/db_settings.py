@@ -26,9 +26,27 @@ RAW_COLLECTION_NAME = _enforce_env("RAW_COLLECTION_NAME")
 CLIENT = MongoClient(MONGO_URI)
 RAW_DB = CLIENT[RAW_DB_NAME]
 RAW_COLLECTION = RAW_DB[RAW_COLLECTION_NAME]
-RAW_COLLECTION.create_index("link", unique=True)
 
 
-def get_raw_collection() -> Collection:
-    """Return the raw jobs collection with deduplication index already configured."""
-    return RAW_COLLECTION
+def get_mongo_client() -> MongoClient:
+    """Return the singleton Mongo client created from environment settings."""
+    return CLIENT
+
+
+def ensure_raw_collection_index(
+    collection: Collection | None = None, *, field_name: str = "link"
+) -> str:
+    """Create the unique index for the supplied collection (defaults to the raw collection)."""
+
+    target = collection if collection is not None else RAW_COLLECTION
+    return target.create_index(field_name, unique=True)
+
+
+def get_raw_collection(client: MongoClient | None = None) -> Collection:
+    """Return the raw jobs collection, ensuring the dedupe field is indexed."""
+
+    active_client = client or CLIENT
+    db = active_client[RAW_DB_NAME]
+    collection = db[RAW_COLLECTION_NAME]
+    ensure_raw_collection_index(collection)
+    return collection
